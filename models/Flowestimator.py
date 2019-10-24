@@ -25,7 +25,6 @@ class FlowEstimator(nn.Module):
     def init_wdt(self, wdtargs):
         self.wdt = WDTransformer(**wdtargs).cuda()
     def forward(self, frame1, frame2):
-
             x = self.wdt(frame1, frame2)
             frame1 = censustransform(frame1)
             frame2 = censustransform(frame2)

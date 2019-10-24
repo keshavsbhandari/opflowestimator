@@ -5,7 +5,7 @@ import pytorch_lightning as pl
 from utils.warper import warper
 from dataloader.sintelloader import SintelLoader
 from utils.photometricloss import photometricloss
-from torch.optim.lr_scheduler import ReduceLROnPlateau,CosineAnnealingLR
+from torch.optim.lr_scheduler import ReduceLROnPlateau, CosineAnnealingLR
 from tqdm import tqdm
 from torch.utils.tensorboard import SummaryWriter
 from utils.averagemeter import AverageMeter
@@ -24,7 +24,7 @@ class FlowTrainer(object):
                                    channel_in=3,
                                    stride=4,
                                    kernel_size=7,
-                                   use_cst=True)
+                                   use_cst=False)
         self.optimizer = None
         self.lr_scheduler = None
         self.save_dir = None
@@ -54,7 +54,8 @@ class FlowTrainer(object):
                              'val_loss': None}
         self.gpu_ids = [0, 1, 2, 3, 4, 5, 6, 7]
 
-        self.optimizer = torch.optim.AdamW(self.model.parameters(), lr=0.0001)
+        # self.optimizer = torch.optim.AdamW(self.model.parameters(), lr=0.0001)
+        self.optimizer = torch.optim.RMSprop(self.model.parameters(), lr=0.001)
         # self.scheduler = ReduceLROnPlateau(self.optimizer)
         self.scheduler = CosineAnnealingLR(self.optimizer, len(self.train_loader.load()))
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -109,6 +110,7 @@ class FlowTrainer(object):
             sampocc = replicatechannel(self.sample_train['occlusionUnet'].cuda())
 
             occs = torch.cat([sampocc, occ])
+            occs = make_grid(occs, nrow=10).unsqueeze(0)
 
             #without unet
             # frames = torch.cat([frame1_, frame1, frame2])
@@ -164,7 +166,7 @@ class FlowTrainer(object):
             frame1 = data['frame1'].to(self.device)
 
             frame1Unet = data['frame1Unet'].to(self.device)
-            # frame2Unet = data['frame2Unet'].to(self.device)
+            frame2Unet = data['frame2Unet'].to(self.device)
             self.optimizer.zero_grad()
 
             # forward
@@ -174,7 +176,7 @@ class FlowTrainer(object):
                 #WITHOUT UNET
                 # loss = photometricloss(frame1, frame1_, occ)
                 #WITH UNET
-                loss = photometricloss(frame1Unet, frame1_, occ)
+                loss = photometricloss(frame1Unet, frame1_,frame2Unet, occ)
                 self.avg_loss.update(loss.item(), i + 1)
                 loss.backward()
                 self.optimizer.step()
@@ -211,7 +213,7 @@ class FlowTrainer(object):
 
                 flow, occ = self.model(frame1, frame2)
                 frame1_ = warper(flow, frame2)
-                loss = photometricloss(frame1Unet, frame1_, occ)
+                loss = photometricloss(frame1Unet, frame1_,frame2Unet, occ)
                 self.avg_loss.update(loss.item(), i + 1)
                 metrics.update({'TSloss': self.avg_loss.avg})
                 teststream.set_postfix(metrics)

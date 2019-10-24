@@ -32,4 +32,4 @@ def censustransform(img):
     mid = img[:, :, :, 4].unsqueeze(-1)
     #NEW WAY START
     encoding = (img >= mid).float().view(-1, 9) * torch.tensor([128., 64., 32., 16., 0., 8., 4., 2., 1.]).cuda()
-    return encoding.sum(-1).view(*size)
+    return encoding.sum(-1).view(*size)/255
