@@ -7,10 +7,10 @@ class Occlusion(nn.Module):
     def __init__(self):
         super(Occlusion, self).__init__()
 
-        self.convbranch1 = torch.nn.Conv2d(in_channels=2, out_channels=8, kernel_size=1, stride=1)
-        self.convbranch2 = torch.nn.Conv2d(in_channels=2, out_channels=8, kernel_size=1, stride=1)
-        self.convbranch3 = torch.nn.Conv2d(in_channels=2, out_channels=8, kernel_size=1, stride=1)
-        self.convmerge = torch.nn.Conv2d(in_channels=8, out_channels=1, kernel_size=1, stride=1)
+        self.convbranch1 = torch.nn.Conv2d(in_channels=2, out_channels=2, kernel_size=1, stride=1)
+        self.convbranch2 = torch.nn.Conv2d(in_channels=2, out_channels=2, kernel_size=1, stride=1)
+        self.convbranch3 = torch.nn.Conv2d(in_channels=2, out_channels=2, kernel_size=1, stride=1)
+        self.convmerge = torch.nn.Conv2d(in_channels=2, out_channels=2, kernel_size=1, stride=1)
 
 
     def forward(self,x):
@@ -19,6 +19,6 @@ class Occlusion(nn.Module):
         x3 = torch.sigmoid(self.convbranch2(x))
         x12 = torch.matmul(x2,x1)
         x13 = torch.matmul(x12,x3)
-        occlusion = torch.sigmoid(self.convmerge(x13))
+        occlusion = 1-torch.softmax(self.convmerge(x13), dim=1)
         return occlusion
 

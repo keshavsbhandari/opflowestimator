@@ -15,7 +15,7 @@ class FlowEstimator(nn.Module):
         :type wdtargs:
         """
         super(FlowEstimator, self).__init__()
-        self.unet = UNet(8, 8)
+        self.unet = UNet(2, 8)
         self.predictflow = nn.Conv2d(kernel_size=3, stride=1, in_channels=8, padding=1, out_channels=2)
         self.occlusion = Occlusion()
 
@@ -26,9 +26,9 @@ class FlowEstimator(nn.Module):
         self.wdt = WDTransformer(**wdtargs).cuda()
     def forward(self, frame1, frame2):
             x = self.wdt(frame1, frame2)
-            frame1 = censustransform(frame1)
-            frame2 = censustransform(frame2)
-            x = torch.cat([x,frame1,frame2],1)
+            # frame1 = censustransform(frame1)
+            # frame2 = censustransform(frame2)
+            # x = torch.cat([x,frame1,frame2],1)
             flow = self.predictflow(self.unet(x))
             occ = 1 - self.occlusion(torch.sigmoid(flow))
             return flow, occ

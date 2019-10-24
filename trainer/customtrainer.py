@@ -4,7 +4,7 @@ from models.Flowestimator import FlowEstimator
 import pytorch_lightning as pl
 from utils.warper import warper
 from dataloader.sintelloader import SintelLoader
-from utils.photometricloss import photometricloss
+from utils.photometricloss import photometricloss,exponentialloss,comboloss
 from torch.optim.lr_scheduler import ReduceLROnPlateau, CosineAnnealingLR
 from tqdm import tqdm
 from torch.utils.tensorboard import SummaryWriter
@@ -22,9 +22,9 @@ class FlowTrainer(object):
         self.model = FlowEstimator(shape=(256, 256),
                                    use_l2=True,
                                    channel_in=3,
-                                   stride=4,
-                                   kernel_size=7,
-                                   use_cst=False)
+                                   stride=1,
+                                   kernel_size=2,
+                                   use_cst=True)
         self.optimizer = None
         self.lr_scheduler = None
         self.save_dir = None
@@ -54,8 +54,8 @@ class FlowTrainer(object):
                              'val_loss': None}
         self.gpu_ids = [0, 1, 2, 3, 4, 5, 6, 7]
 
-        # self.optimizer = torch.optim.AdamW(self.model.parameters(), lr=0.0001)
-        self.optimizer = torch.optim.RMSprop(self.model.parameters(), lr=0.001)
+        self.optimizer = torch.optim.AdamW(self.model.parameters(), lr=0.0001)
+        # self.optimizer = torch.optim.Adam(self.model.parameters(), lr=0.01)
         # self.scheduler = ReduceLROnPlateau(self.optimizer)
         self.scheduler = CosineAnnealingLR(self.optimizer, len(self.train_loader.load()))
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -176,7 +176,8 @@ class FlowTrainer(object):
                 #WITHOUT UNET
                 # loss = photometricloss(frame1, frame1_, occ)
                 #WITH UNET
-                loss = photometricloss(frame1Unet, frame1_,frame2Unet, occ)
+                # loss = photometricloss(frame1Unet, frame1_,frame2Unet, occ)
+                loss = comboloss(frame1Unet,frame2Unet,frame1_,occ)
                 self.avg_loss.update(loss.item(), i + 1)
                 loss.backward()
                 self.optimizer.step()
@@ -213,11 +214,12 @@ class FlowTrainer(object):
 
                 flow, occ = self.model(frame1, frame2)
                 frame1_ = warper(flow, frame2)
-                loss = photometricloss(frame1Unet, frame1_,frame2Unet, occ)
+                # loss = photometricloss(frame1Unet, frame1_,frame2Unet, occ)
+                loss = comboloss(frame1Unet, frame2Unet, frame1_,occ)
                 self.avg_loss.update(loss.item(), i + 1)
                 metrics.update({'TSloss': self.avg_loss.avg})
                 teststream.set_postfix(metrics)
-                self.writer.add_scalar('Loss/test', self.avg_loss.avg, i)
+        self.writer.add_scalar('Loss/test', self.avg_loss.avg, metrics.get('epoch'))
         teststream.close()
 
         return self.test_end(metrics)

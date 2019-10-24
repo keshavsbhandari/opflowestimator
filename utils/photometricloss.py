@@ -8,12 +8,35 @@ import torch.nn.functional as F
 def normalize(x, mean=0, std=0.1):
     return Normalize(mean, std)(x)
 
-def photometricloss(I, I_, I1, occ):
+def comboloss(I1,I2,I1_,occ):
+    photo1 = reconloss(I1,I1_,occ)
+    photo2 = reconloss(I2,I1_,occ)
+    photoexp = torch.exp(photo1/(photo2+1e-10))
+
+    ssim1 = ssim(I1,I1_)
+    ssim2 = ssim(I2,I1_)
+
+    ssimexp = torch.exp(ssim1/(ssim2+1e-10))
+
+    msexp = exponentialloss(I1,I2,I1_)
+
+    return photoexp + ssimexp + msexp
+
+
+
+def photometricloss(I, I_, occ):
     ssimloss = ssim(I, I_)
     losslimit = reconloss(I,I_,occ)
-    realloss = reconloss(I,I1,occ)
-    photomax = torch.min(losslimit, realloss)
-    return ssimloss + photomax
+    # realloss = reconloss(I,I1,occ)
+    # photomax = torch.min(losslimit, realloss)
+    return ssimloss + losslimit
+
+def exponentialloss(I1,I2,I1_):
+    mse1 = F.mse_loss(I1,I1_)
+    mse2 = F.mse_loss(I2,I1_)
+
+    frac = torch.exp(mse1/(mse2+1e-10))
+    return frac
 
 
 
@@ -32,7 +55,7 @@ def ssim(x, y):
     # x = x * occ
     # y = y * occ
 
-    mse = F.mse_loss(x, y)
+    # mse = F.mse_loss(x, y)
     C1 = 0.01 ** 2
     C2 = 0.03 ** 2
 
@@ -48,5 +71,5 @@ def ssim(x, y):
 
     SSIM = SSIM_n / SSIM_d
 
-    loss = mse + torch.clamp((1 - SSIM) / 2, 0, 1).mean()
+    loss = torch.clamp((1 - SSIM) / 2, 0, 1).mean()
     return loss
