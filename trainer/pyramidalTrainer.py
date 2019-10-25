@@ -36,7 +36,7 @@ class FlowTrainer(object):
 
         self.epoch = 1000
 
-        self.train_loader = SintelLoader(batch_size=20,
+        self.train_loader = SintelLoader(batch_size=1,
                                          pin_memory=True,
                                          num_workers=8,)
 
@@ -102,10 +102,12 @@ class FlowTrainer(object):
 
             frame1Unet = self.sample_train['frame1Unet'].to(self.device)
             frame2Unet = self.sample_train['frame2Unet'].to(self.device)
+            frame1Unet_ = self.sample_train['frame1Unet_'].to(self.device)
 
 
             flow, occ = self.model(frame1, frame2)
-            frame2_ = warper(flow, frame1)
+            flow = flow * 256.
+            frame1_ = warper(flow, frame2Unet)
 
             occ = replicatechannel(occ)
 
@@ -120,14 +122,14 @@ class FlowTrainer(object):
             #without unet
             # frames = torch.cat([frame1_, frame1, frame2])
             # with unet
-            frames = torch.cat([frame2_, frame2Unet, frame1Unet])
+            frames = torch.cat([frame1_, frame1Unet_, frame1Unet, frame2Unet])
 
             frames = make_grid(frames, nrow=10).unsqueeze(0)
 
             #without unet
             # flows = torch.cat([flow2rgb(flow.cpu()).cuda(), self.sample_train['flow'].cuda()])
             # with unet
-            flows = torch.cat([flow2rgb(-flow.cpu()).cuda(), self.sample_train['flowUnet'].cuda()])
+            flows = torch.cat([flow2rgb(flow.cpu(),scaled = True).cuda(), self.sample_train['flowUnet'].cuda()])
             flows = make_grid(flows, nrow=10).unsqueeze(0)
 
             self.writer.add_images('TRAIN/Frames', frames, metrics.get('nb_batch'))
@@ -148,10 +150,10 @@ class FlowTrainer(object):
             frame2Unet = self.sample_test['frame2Unet'].to(self.device)
 
             flow, occ = self.model(frame1, frame2)
-            frame1_ = warper(flow, frame2)
+            frame1_ = warper(flow, frame2Unet)
             occ = replicatechannel(occ)
 
-            frames = torch.cat([frame1_, frame1Unet, frame2Unet, -flow2rgb(flow.cpu()).cuda(), occ])
+            frames = torch.cat([frame1_, frame1Unet, frame2Unet, flow2rgb(flow.cpu(),scaled = True).cuda(), occ])
             frames = make_grid(frames, nrow=10).unsqueeze(0)
 
             self.writer.add_images('TEST/Frames', frames, metrics.get('nb_batch'))
@@ -173,48 +175,55 @@ class FlowTrainer(object):
             frame1Unet = data['frame1Unet'].to(self.device)
             frame2Unet = data['frame2Unet'].to(self.device)
 
-            frame1Unet1 = data['frame1Unet1'].to(self.device)
-            frame2Unet1 = data['frame2Unet1'].to(self.device)
+            # frame1Unet1 = data['frame1Unet1'].to(self.device)
+            # frame2Unet1 = data['frame2Unet1'].to(self.device)
+            #
+            # frame1Unet2 = data['frame1Unet2'].to(self.device)
+            # frame2Unet2 = data['frame2Unet2'].to(self.device)
+            #
+            # frame1Unet3 = data['frame1Unet3'].to(self.device)
+            # frame2Unet3 = data['frame2Unet3'].to(self.device)
 
-            frame1Unet2 = data['frame1Unet2'].to(self.device)
-            frame2Unet2 = data['frame2Unet2'].to(self.device)
+            # frame1Unet4 = data['frame1Unet4'].to(self.device)
+            # frame2Unet4 = data['frame2Unet4'].to(self.device)
 
-            frame1Unet3 = data['frame1Unet3'].to(self.device)
-            frame2Unet3 = data['frame2Unet3'].to(self.device)
-
-            frame1Unet4 = data['frame1Unet4'].to(self.device)
-            frame2Unet4 = data['frame2Unet4'].to(self.device)
-
-            frame1Unet5 = data['frame1Unet5'].to(self.device)
-            frame2Unet5 = data['frame2Unet5'].to(self.device)
-
-            frame1Unet6 = data['frame1Unet6'].to(self.device)
-            frame2Unet6 = data['frame2Unet6'].to(self.device)
+            # frame1Unet5 = data['frame1Unet5'].to(self.device)
+            # frame2Unet5 = data['frame2Unet5'].to(self.device)
+            #
+            # frame1Unet6 = data['frame1Unet6'].to(self.device)
+            # frame2Unet6 = data['frame2Unet6'].to(self.device)
 
 
             self.optimizer.zero_grad()
 
             # forward
             with torch.set_grad_enabled(True):
-                flow1, flow2, flow3, flow4, flow5, flow6, flow, occ1, occ2, occ3, occ4, occ5, occ6, occ = self.model(frame1, frame2)
+                # flow1, flow2, flow3, flow4, flow5, flow6, flow, occ1, occ2, occ3, occ4, occ5, occ6, occ = self.model(frame1, frame2)
+                flow, occ = self.model(frame1, frame2)
+
+                print(flow.shape)
+                print(frame2Unet.shape)
                 
                 frame1_ = warper(flow, frame2Unet)
-                frame1_1 = warper(flow1, frame2Unet1)
-                frame1_2 = warper(flow2, frame2Unet2)
-                frame1_3 = warper(flow3, frame2Unet3)
-                frame1_4 = warper(flow4, frame2Unet4)
-                frame1_5 = warper(flow5, frame2Unet5)
-                frame1_6 = warper(flow6, frame2Unet6)
+                # frame1_1 = warper(flow1, frame2Unet1)
+                # frame1_2 = warper(flow2, frame2Unet2)
+                # frame1_3 = warper(flow3, frame2Unet3)
+                # frame1_4 = warper(flow4, frame2Unet4)
+                # frame1_5 = warper(flow5, frame2Unet5)
+                # frame1_6 = warper(flow6, frame2Unet6)
 
-                loss1_ = comboloss(frame1Unet,frame2Unet,frame1_,occ)
-                loss1_1 = comboloss(frame1Unet1, frame2Unet1, frame1_1, occ1)
-                loss1_2 = comboloss(frame1Unet2, frame2Unet2, frame1_2, occ2)
-                loss1_3 = comboloss(frame1Unet3, frame2Unet3, frame1_3, occ3)
-                loss1_4 = comboloss(frame1Unet4, frame2Unet4, frame1_4, occ4)
-                loss1_5 = comboloss(frame1Unet5, frame2Unet5, frame1_5, occ5)
-                loss1_6 = comboloss(frame1Unet6, frame2Unet6, frame1_6, occ6)
+                loss = comboloss(frame1Unet,frame2Unet,frame1_,occ)
+                # loss1_1 = comboloss(frame1Unet1, frame2Unet1, frame1_1, occ1)
+                # loss1_2 = comboloss(frame1Unet2, frame2Unet2, frame1_2, occ2)
+                # loss1_3 = comboloss(frame1Unet3, frame2Unet3, frame1_3, occ3)
+                # loss1_4 = comboloss(frame1Unet4, frame2Unet4, frame1_4, occ4)
+                # loss1_5 = comboloss(frame1Unet5, frame2Unet5, frame1_5, occ5)
+                # loss1_6 = comboloss(frame1Unet6, frame2Unet6, frame1_6, occ6)
 
-                loss = loss1_ + loss1_1 + loss1_2 + loss1_3 + loss1_4 + loss1_5 + loss1_6
+                # loss = (loss1_ + loss1_4)/2.
+                # loss = (loss1_ + loss1_4 + loss1_5 + loss1_6) / 4.
+
+                # loss = (loss1_ + loss1_1 + loss1_2 + loss1_3 + loss1_4 + loss1_5 + loss1_6) / 7.
 
                 #WITHOUT UNET
                 # loss = photometricloss(frame1, frame1_, occ)
@@ -254,9 +263,8 @@ class FlowTrainer(object):
                 frame2Unet = data['frame2Unet'].to(self.device)
                 frame1Unet = data['frame1Unet'].to(self.device)
 
-
                 flow, occ = self.model(frame1, frame2)
-                frame1_ = warper(flow, frame2)
+                frame1_ = warper(flow, frame2Unet)
                 # loss = photometricloss(frame1Unet, frame1_,frame2Unet, occ)
                 loss = comboloss(frame1Unet, frame2Unet, frame1_,occ)
                 self.avg_loss.update(loss.item(), i + 1)

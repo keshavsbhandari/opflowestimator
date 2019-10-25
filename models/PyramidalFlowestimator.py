@@ -2,7 +2,8 @@ import torch.nn as nn
 import torch
 from models.DenseNet import DenseNet
 from models.PyramidalUNet import UNet
-from models.Occlusion import Occlusion
+# from models.Occlusion import Occlusion
+from models.Attention import SelfAttentionFlow
 from models.TwoLayerArch import Twolayer
 from utils.masktransform import WDTransformer
 from utils.censustransform import censustransform
@@ -16,14 +17,9 @@ class FlowEstimator(nn.Module):
         """
         super(FlowEstimator, self).__init__()
         self.unet = UNet(8, 8)
-        self.predictflow = nn.Conv2d(kernel_size=3, stride=1, in_channels=8, padding=1, out_channels=2)
-        self.occlusion = Occlusion()
-        self.pyramid_occlusion1 = Occlusion()
-        self.pyramid_occlusion2 = Occlusion()
-        self.pyramid_occlusion3 = Occlusion()
-        self.pyramid_occlusion4 = Occlusion()
-        self.pyramid_occlusion5 = Occlusion()
-        self.pyramid_occlusion6 = Occlusion()
+
+        self.predictflow_and_occlusion = SelfAttentionFlow()
+
 
         """Another Options"""
         self.init_wdt(wdtargs)
@@ -38,20 +34,24 @@ class FlowEstimator(nn.Module):
         x = torch.cat([x, frame1, frame2], 1)
         # x = torch.cat([frame1, frame2], 1)
         if self.training:
-            flow1, flow2, flow3, flow4, flow5, flow6, out = self.unet(x)
-            occ1 = self.occlusion1(torch.sigmoid(flow1))
-            occ2 = self.occlusion1(torch.sigmoid(flow2))
-            occ3 = self.occlusion1(torch.sigmoid(flow3))
-            occ4 = self.occlusion1(torch.sigmoid(flow4))
-            occ5 = self.occlusion1(torch.sigmoid(flow5))
-            occ6 = self.occlusion1(torch.sigmoid(flow6))
+            # flow1, flow2, flow3, flow4, flow5, flow6, out = self.unet(x)
+            # flow4, flow5, flow6, out = self.unet(x)
+            out = self.unet(x)
+            # flow1, occ1 = self.predictflow(flow1)
+            # flow2, occ2 = self.predictflow(flow2)
+            # flow3, occ3 = self.predictflow(flow3)
+            # flow4, occ4 = self.predictflow_and_occlusion(flow4)
+            # flow4 = self.predictflow(flow4)
+            # flow5, occ5 = self.predictflow(flow5)
+            # flow6, occ6 = self.predictflow(flow6)
+            flow, occ = self.predictflow_and_occlusion(out)
+            # flow = self.predictflow(flow)
+            return flow, occ
+            # return flow4, flow5, flow6, flow, occ4, occ5, occ6, occ
+            # return flow1, flow2, flow3, flow4, flow5, flow6, flow, occ1, occ2, occ3, occ4, occ5, occ6, occ
 
-            flow = self.predictflow(out)
-
-            occ = self.occlusion(torch.sigmoid(flow))
-
-            return flow1, flow2, flow3, flow4, flow5, flow6, flow, occ1, occ2, occ3, occ4, occ5, occ6, occ
         else:
             out = self.unet(x)
-            flow = self.predictflow(out)
-            return flow, out
+            flow, occ = self.predictflow_and_occlusion(out)
+            # flow = self.predictflow(flow)
+            return flow, occ

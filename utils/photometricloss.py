@@ -20,7 +20,7 @@ def comboloss(I1,I2,I1_,occ):
 
     msexp = exponentialloss(I1,I2,I1_)
 
-    return photoexp + ssimexp + msexp
+    return (photoexp + ssimexp + msexp)/3.
 
 
 

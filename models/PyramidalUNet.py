@@ -2,16 +2,17 @@ import torch
 from torch import nn
 import torch.nn.functional as F
 import torch.optim as optim
+from models.Spectral import SpectralNorm
 
 
 class UNet(nn.Module):
 
     def contracting_block(self, in_channels, out_channels, kernel_size=3):
         block = torch.nn.Sequential(
-            torch.nn.Conv2d(kernel_size=kernel_size, in_channels=in_channels, out_channels=out_channels),
+            SpectralNorm(torch.nn.Conv2d(kernel_size=kernel_size, in_channels=in_channels, out_channels=out_channels)),
             torch.nn.LeakyReLU(),
             torch.nn.BatchNorm2d(out_channels),
-            torch.nn.Conv2d(kernel_size=kernel_size, in_channels=out_channels, out_channels=out_channels),
+            SpectralNorm(torch.nn.Conv2d(kernel_size=kernel_size, in_channels=out_channels, out_channels=out_channels)),
             torch.nn.LeakyReLU(),
             torch.nn.BatchNorm2d(out_channels),
         )
@@ -19,39 +20,39 @@ class UNet(nn.Module):
 
     def expansive_final(self, in_channels, mid_channels, out_channels, kernel_size=3):
         block = torch.nn.Sequential(
-            torch.nn.Conv2d(kernel_size=kernel_size, in_channels=in_channels, out_channels=mid_channels[0]),
+            SpectralNorm(torch.nn.Conv2d(kernel_size=kernel_size, in_channels=in_channels, out_channels=mid_channels[0])),
             torch.nn.LeakyReLU(),
             torch.nn.BatchNorm2d(mid_channels[0]),
-            torch.nn.Conv2d(kernel_size=kernel_size, in_channels=mid_channels[0], out_channels=mid_channels[1]),
+            SpectralNorm(torch.nn.Conv2d(kernel_size=kernel_size, in_channels=mid_channels[0], out_channels=mid_channels[1])),
             torch.nn.LeakyReLU(),
             torch.nn.BatchNorm2d(mid_channels[1]),
-            torch.nn.ConvTranspose2d(in_channels=mid_channels[1], out_channels=out_channels, kernel_size=3, stride=2,
-                                     padding=1, output_padding=1)
+            SpectralNorm(torch.nn.ConvTranspose2d(in_channels=mid_channels[1], out_channels=out_channels, kernel_size=3, stride=2,
+                                     padding=1, output_padding=1))
         )
         return block
 
     def expansive_block(self, in_channels, mid_channel, out_channels, kernel_size=3):
         block = torch.nn.Sequential(
-            torch.nn.Conv2d(kernel_size=kernel_size, in_channels=in_channels, out_channels=mid_channel),
+            SpectralNorm(torch.nn.Conv2d(kernel_size=kernel_size, in_channels=in_channels, out_channels=mid_channel)),
             torch.nn.LeakyReLU(),
             torch.nn.BatchNorm2d(mid_channel),
-            torch.nn.Conv2d(kernel_size=kernel_size, in_channels=mid_channel, out_channels=mid_channel),
+            SpectralNorm(torch.nn.Conv2d(kernel_size=kernel_size, in_channels=mid_channel, out_channels=mid_channel)),
             torch.nn.LeakyReLU(),
             torch.nn.BatchNorm2d(mid_channel),
-            torch.nn.ConvTranspose2d(in_channels=mid_channel, out_channels=out_channels, kernel_size=3, stride=2,
-                                     padding=1, output_padding=1)
+            SpectralNorm(torch.nn.ConvTranspose2d(in_channels=mid_channel, out_channels=out_channels, kernel_size=3, stride=2,
+                                     padding=1, output_padding=1))
         )
         return block
 
     def final_block(self, in_channels, mid_channel, out_channels, kernel_size=3):
         block = torch.nn.Sequential(
-            torch.nn.Conv2d(kernel_size=kernel_size, in_channels=in_channels, out_channels=mid_channel),
+            SpectralNorm(torch.nn.Conv2d(kernel_size=kernel_size, in_channels=in_channels, out_channels=mid_channel)),
             torch.nn.LeakyReLU(),
             torch.nn.BatchNorm2d(mid_channel),
-            torch.nn.Conv2d(kernel_size=kernel_size, in_channels=mid_channel, out_channels=mid_channel),
+            SpectralNorm(torch.nn.Conv2d(kernel_size=kernel_size, in_channels=mid_channel, out_channels=mid_channel)),
             torch.nn.LeakyReLU(),
             torch.nn.BatchNorm2d(mid_channel),
-            torch.nn.Conv2d(kernel_size=kernel_size, in_channels=mid_channel, out_channels=out_channels, padding=1),
+            SpectralNorm(torch.nn.Conv2d(kernel_size=kernel_size, in_channels=mid_channel, out_channels=out_channels, padding=1)),
             torch.nn.LeakyReLU(),
         )
         return block
@@ -82,12 +83,30 @@ class UNet(nn.Module):
         self.final_layer = self.final_block(128, 64, out_channel)
         self.expansive_final_block = self.expansive_final(out_channel, [32, 8], out_channels=2)
 
-        self.pyramid_feature1 = nn.Conv2d(in_channels=64, out_channels=2, kernel_size=3, stride=1, padding=1)
-        self.pyramid_feature2 = nn.Conv2d(in_channels=128, out_channels=2, kernel_size=3, stride=1, padding=1)
-        self.pyramid_feature3 = nn.Conv2d(in_channels=256, out_channels=2, kernel_size=3, stride=1, padding=1)
-        self.pyramid_feature4 = nn.Conv2d(in_channels=256, out_channels=2, kernel_size=3, stride=1, padding=1)
-        self.pyramid_feature5 = nn.Conv2d(in_channels=128, out_channels=2, kernel_size=3, stride=1, padding=1)
-        self.pyramid_feature6 = nn.Conv2d(in_channels=64, out_channels=2, kernel_size=3, stride=1, padding=1)
+        # self.pyramid_feature1 = nn.Sequential(SpectralNorm(nn.Conv2d(in_channels=64, out_channels=8, kernel_size=3, stride=1, padding=1)),
+        #                                       torch.nn.LeakyReLU(),
+        #                                       torch.nn.BatchNorm2d(8),
+        #                                       )
+        # self.pyramid_feature2 = nn.Sequential(SpectralNorm(nn.Conv2d(in_channels=128, out_channels=8, kernel_size=3, stride=1, padding=1)),
+        #                                       torch.nn.LeakyReLU(),
+        #                                       torch.nn.BatchNorm2d(8),
+        #                                       )
+        # self.pyramid_feature3 = nn.Sequential(SpectralNorm(nn.Conv2d(in_channels=256, out_channels=8, kernel_size=3, stride=1, padding=1)),
+        #                                       torch.nn.LeakyReLU(),
+        #                                       torch.nn.BatchNorm2d(8),
+        #                                       )
+        # self.pyramid_feature4 = nn.Sequential(SpectralNorm(nn.Conv2d(in_channels=256, out_channels=8, kernel_size=3, stride=1, padding=1)),
+        #                                       torch.nn.LeakyReLU(),
+        #                                       torch.nn.BatchNorm2d(8),
+        #                                       )
+        # self.pyramid_feature5 = nn.Sequential(SpectralNorm(nn.Conv2d(in_channels=128, out_channels=8, kernel_size=3, stride=1, padding=1)),
+        #                                       torch.nn.LeakyReLU(),
+        #                                       torch.nn.BatchNorm2d(8),
+        #                                       )
+        # self.pyramid_feature6 = nn.Sequential(SpectralNorm(nn.Conv2d(in_channels=64, out_channels=8, kernel_size=3, stride=1, padding=1)),
+        #                                       torch.nn.LeakyReLU(),
+        #                                       torch.nn.BatchNorm2d(8),
+        #                                       )
 
     def crop_and_concat(self, upsampled, bypass, crop=True):
         if crop:
@@ -122,13 +141,17 @@ class UNet(nn.Module):
         final_layer = self.final_layer(decode_block1)
 
         if self.training:
-            flow1 = self.pyramid_feature1(encode_block1)
-            flow2 = self.pyramid_feature2(encode_block1)
-            flow3 = self.pyramid_feature3(encode_block1)
-            flow4 = self.pyramid_feature4(encode_block1)
-            flow5 = self.pyramid_feature6(encode_block1)
-            flow6 = self.pyramid_feature6(encode_block1)
+            # flow1 = self.pyramid_feature1(encode_pool1)
+            # flow2 = self.pyramid_feature2(encode_pool2)
+            # flow3 = self.pyramid_feature3(encode_pool3)
+            # flow4 = self.pyramid_feature4(bottleneck1)
+            # flow5 = self.pyramid_feature5(cat_layer2)
+            # flow6 = self.pyramid_feature6(cat_layer1)
 
-            return flow1, flow2, flow3, flow4, flow5, flow6, final_layer
+            # return flow4, flow5, flow6, final_layer
+
+            return  final_layer
+
+            # return flow1, flow2, flow3, flow4, flow5, flow6, final_layer
         else:
             return final_layer
