@@ -1,9 +1,14 @@
 import torch
 from torch.nn import functional as F
-from models.Flowestimator import FlowEstimator
+# from models.Flowestimator import FlowEstimator
+from models.PyramidalFlowestimator import FlowEstimator
+
 import pytorch_lightning as pl
 from utils.warper import warper
-from dataloader.sintelloader import SintelLoader
+
+from dataloader.pyramidalsintelloader import SintelLoader
+
+
 from utils.photometricloss import photometricloss,exponentialloss,comboloss
 from torch.optim.lr_scheduler import ReduceLROnPlateau, CosineAnnealingLR
 from tqdm import tqdm
@@ -97,11 +102,10 @@ class FlowTrainer(object):
 
             frame1Unet = self.sample_train['frame1Unet'].to(self.device)
             frame2Unet = self.sample_train['frame2Unet'].to(self.device)
-            frame1Unet_ = self.sample_train['frame1Unet_'].to(self.device)
 
 
             flow, occ = self.model(frame1, frame2)
-            frame1_ = warper(flow, frame2)
+            frame2_ = warper(flow, frame1)
 
             occ = replicatechannel(occ)
 
@@ -116,7 +120,7 @@ class FlowTrainer(object):
             #without unet
             # frames = torch.cat([frame1_, frame1, frame2])
             # with unet
-            frames = torch.cat([frame1_,frame1Unet_, frame2Unet, frame1Unet])
+            frames = torch.cat([frame2_, frame2Unet, frame1Unet])
 
             frames = make_grid(frames, nrow=10).unsqueeze(0)
 
@@ -144,10 +148,10 @@ class FlowTrainer(object):
             frame2Unet = self.sample_test['frame2Unet'].to(self.device)
 
             flow, occ = self.model(frame1, frame2)
-            frame1_ = warper(-flow, frame2Unet)
+            frame1_ = warper(flow, frame2)
             occ = replicatechannel(occ)
 
-            frames = torch.cat([frame1_, frame1Unet, frame2Unet, flow2rgb(-flow.cpu()).cuda(), occ])
+            frames = torch.cat([frame1_, frame1Unet, frame2Unet, -flow2rgb(flow.cpu()).cuda(), occ])
             frames = make_grid(frames, nrow=10).unsqueeze(0)
 
             self.writer.add_images('TEST/Frames', frames, metrics.get('nb_batch'))
@@ -168,17 +172,55 @@ class FlowTrainer(object):
 
             frame1Unet = data['frame1Unet'].to(self.device)
             frame2Unet = data['frame2Unet'].to(self.device)
+
+            frame1Unet1 = data['frame1Unet1'].to(self.device)
+            frame2Unet1 = data['frame2Unet1'].to(self.device)
+
+            frame1Unet2 = data['frame1Unet2'].to(self.device)
+            frame2Unet2 = data['frame2Unet2'].to(self.device)
+
+            frame1Unet3 = data['frame1Unet3'].to(self.device)
+            frame2Unet3 = data['frame2Unet3'].to(self.device)
+
+            frame1Unet4 = data['frame1Unet4'].to(self.device)
+            frame2Unet4 = data['frame2Unet4'].to(self.device)
+
+            frame1Unet5 = data['frame1Unet5'].to(self.device)
+            frame2Unet5 = data['frame2Unet5'].to(self.device)
+
+            frame1Unet6 = data['frame1Unet6'].to(self.device)
+            frame2Unet6 = data['frame2Unet6'].to(self.device)
+
+
             self.optimizer.zero_grad()
 
             # forward
             with torch.set_grad_enabled(True):
-                flow, occ = self.model(frame1, frame2)
-                frame1_ = warper(-flow, frame2Unet)
+                flow1, flow2, flow3, flow4, flow5, flow6, flow, occ1, occ2, occ3, occ4, occ5, occ6, occ = self.model(frame1, frame2)
+                
+                frame1_ = warper(flow, frame2Unet)
+                frame1_1 = warper(flow1, frame2Unet1)
+                frame1_2 = warper(flow2, frame2Unet2)
+                frame1_3 = warper(flow3, frame2Unet3)
+                frame1_4 = warper(flow4, frame2Unet4)
+                frame1_5 = warper(flow5, frame2Unet5)
+                frame1_6 = warper(flow6, frame2Unet6)
+
+                loss1_ = comboloss(frame1Unet,frame2Unet,frame1_,occ)
+                loss1_1 = comboloss(frame1Unet1, frame2Unet1, frame1_1, occ1)
+                loss1_2 = comboloss(frame1Unet2, frame2Unet2, frame1_2, occ2)
+                loss1_3 = comboloss(frame1Unet3, frame2Unet3, frame1_3, occ3)
+                loss1_4 = comboloss(frame1Unet4, frame2Unet4, frame1_4, occ4)
+                loss1_5 = comboloss(frame1Unet5, frame2Unet5, frame1_5, occ5)
+                loss1_6 = comboloss(frame1Unet6, frame2Unet6, frame1_6, occ6)
+
+                loss = loss1_ + loss1_1 + loss1_2 + loss1_3 + loss1_4 + loss1_5 + loss1_6
+
                 #WITHOUT UNET
                 # loss = photometricloss(frame1, frame1_, occ)
                 #WITH UNET
                 # loss = photometricloss(frame1Unet, frame1_,frame2Unet, occ)
-                loss = comboloss(frame1Unet,frame2Unet,frame1_,occ)
+                # loss = comboloss(frame1Unet,frame2Unet,frame1_,occ)
                 self.avg_loss.update(loss.item(), i + 1)
                 loss.backward()
                 self.optimizer.step()
